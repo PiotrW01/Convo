@@ -1,0 +1,38 @@
+# Base style
+BasedOnStyle: LLVM
+IndentWidth: 4        # Spaces per indentation level
+TabWidth: 4
+UseTab: Never         # Use spaces instead of tabs
+AllowShortFunctionsOnASingleLine: Inline  # Allow short functions on one line
+
+# Braces
+BreakBeforeBraces: Attach   # Attach opening braces to the line (functions, classes, loops)
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: true
+  BeforeElse: true
+
+# Spaces
+SpaceBeforeParens: ControlStatements   # Add space before parentheses for if/for/while
+SpaceAfterCStyleCast: true
+SpacesInParentheses: false
+SpacesInAngles: false
+
+# Commas & Operators
+SpaceBeforeAssignmentOperators: true
+
+# Alignments
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignOperands: true
+
+# Misc
+SortIncludes: true
+AllowShortIfStatementsOnASingleLine: false
+ColumnLimit: 100
