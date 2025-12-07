@@ -1,6 +1,16 @@
+file(GLOB CLIENT_SOURCES "src/*.cpp")
+
 add_executable(client
-    src/main.cpp
+    ${CLIENT_SOURCES}
 )
 
-target_include_directories(client PRIVATE include)
-#target_link_libraries(server PRIVATE common)
+
+
+target_include_directories(client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+
+target_link_libraries(client
+    ftxui-component
+    ftxui-dom
+    ftxui-screen
+)
