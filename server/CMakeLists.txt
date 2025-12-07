@@ -1,6 +1,8 @@
+file(GLOB SOURCES "src/*.cpp")
+
 add_executable(server
-    src/main.cpp
+    ${SOURCES}
 )
 
-target_include_directories(server PRIVATE include)
+target_include_directories(server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 #target_link_libraries(server PRIVATE common)
