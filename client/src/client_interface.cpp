@@ -44,7 +44,6 @@ void ClientInterface::init() {
         separator,
         input_component,
     });
-
     input_component->TakeFocus();
     m_screen.Loop(main_container);
 }

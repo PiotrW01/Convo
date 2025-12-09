@@ -1,6 +1,8 @@
 #include <iostream>
 
 #include "ftxui/component/component.hpp"
+#include "protocol.hpp"
+#include <cerrno>
 #include <string>
 #include <sys/socket.h>
 #include <thread>
@@ -29,16 +31,46 @@ void Client::run() {
                              sizeof(serverAddress));
         if (status < 0) {
             interface.printMessage("Disconnected");
+            interface.printMessage(strerror(errno));
             interface.on_enter_cb = [this](std::string &msg) { msg = ""; };
             return;
         }
 
+        std::vector<uint8_t> buffer;
+
         while (true) {
-            char buffer[1024];
-            int  bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
-            if (bytes <= 0)
+            size_t currentLength = buffer.size();
+            buffer.resize(currentLength + 8192);
+
+            int bytesReceived = recv(clientSocket, buffer.data() + currentLength, 8192, 0);
+            if (bytesReceived <= 0) {
                 break;
-            interface.printMessage(std::string(buffer, bytes));
+            }
+            buffer.resize(currentLength + bytesReceived);
+
+            while (buffer.size() >= sizeof(Proto::PacketHeader)) {
+                Proto::PacketHeader hdr;
+                memcpy(&hdr, buffer.data(), sizeof(hdr));
+
+                uint16_t payloadSize = ntohs(hdr.length);
+
+                if (buffer.size() < sizeof(hdr) + payloadSize)
+                    break;
+
+                std::vector<uint8_t> payload(buffer.begin() + sizeof(hdr),
+                                             buffer.begin() + sizeof(hdr) + payloadSize);
+
+                switch (hdr.id) {
+                case Proto::ID::MESSAGE: {
+                    Proto::Message msg = Proto::Message::deserialize(payload);
+                    interface.printMessage(msg.message);
+                }
+                default:
+                    break;
+                }
+
+                buffer.erase(buffer.begin(), buffer.begin() + sizeof(hdr) + payloadSize);
+            }
         }
         close(clientSocket);
     });
@@ -47,5 +79,9 @@ void Client::run() {
 }
 
 void Client::sendMessage(std::string &msg) {
-    send(clientSocket, msg.data(), msg.length(), 0);
+    // send(clientSocket, msg.data(), msg.length(), 0);
+    std::vector<uint8_t> payload = Proto::Message::serialize(msg);
+    Proto::PacketHeader  hdr(Proto::ID::MESSAGE, payload.size());
+    send(clientSocket, &hdr, sizeof(hdr), 0);
+    send(clientSocket, payload.data(), payload.size(), 0);
 }
