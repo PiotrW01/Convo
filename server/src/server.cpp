@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "protocol.hpp"
 #include <chrono>
 #include <functional>
 #include <iostream>
@@ -21,6 +22,8 @@ Server::Server(std::optional<int> port) {
     serverAddress.sin_port        = htons(m_serverPort);
     serverAddress.sin_family      = AF_INET;
 
+    int yes = 1;
+    setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
     bind(m_serverSocket, reinterpret_cast<struct sockaddr *>(&serverAddress),
          sizeof(serverAddress));
     int status = listen(m_serverSocket, 128);
@@ -29,11 +32,9 @@ Server::Server(std::optional<int> port) {
         exit(-1);
     }
 
-    pollfd serverPoll{};
-    serverPoll.fd     = m_serverSocket;
-    serverPoll.events = POLLIN;
-    m_fds.push_back(serverPoll);
-
+    m_serverPoll.fd     = m_serverSocket;
+    m_serverPoll.events = POLLIN;
+    m_fds.push_back(m_serverPoll);
     //  for (std::thread &t : m_workerThreads) {
     //      t = std::thread(std::bind(&Server::workerFunc, this));
     //  }
@@ -75,10 +76,14 @@ void Server::workerFunc() {
 }
 
 void Server::broadcastMessage(const std::string &msg) {
+    std::vector<uint8_t> payload = Proto::Message::serialize(msg);
+    Proto::PacketHeader  hdr(Proto::ID::MESSAGE, payload.size());
+
     for (auto &client : m_fds) {
         if (client.fd == m_serverSocket)
             continue;
-        send(client.fd, msg.data(), msg.size(), 0);
+        send(client.fd, &hdr, sizeof(hdr), 0);
+        send(client.fd, payload.data(), payload.size(), 0);
     }
 }
 
@@ -88,48 +93,89 @@ void Server::processMessage(const std::string &msg, int clientFD) {
 }
 
 void Server::handleConnections(std::vector<pollfd> &m_fds) {
-    for (int i = 0; i < m_fds.size(); i++) {
-        if (!(m_fds[i].revents & POLLIN))
+    for (int socket = 0; socket < m_fds.size(); socket++) {
+        if (!(m_fds[socket].revents & POLLIN))
             continue;
 
-        if (m_fds[i].fd == m_serverSocket) {
+        if (m_fds[socket].fd == m_serverSocket) {
             int clientSocket = accept(m_serverSocket, nullptr, nullptr);
             if (clientSocket >= 0) {
+                std::cout << "someone connected!\n";
                 connectClient(clientSocket);
             }
-        } else {
-            char buffer[1024];
-            int  bytes = recv(m_fds[i].fd, buffer, sizeof(buffer), 0);
-            if (bytes <= 0) {
-                disconnectClient(i);
-            } else {
-                // will probably be offloaded to a worker thread?
-                std::string msg(buffer, bytes);
-                processMessage(msg, i);
-            }
+            continue;
         }
+
+        auto  &clientBuffer  = m_clientBuffers[socket];
+        size_t currentLength = clientBuffer.size();
+        clientBuffer.resize(currentLength + 8192);
+
+        int bytesReceived = recv(m_fds[socket].fd, clientBuffer.data() + currentLength, 8192, 0);
+        if (bytesReceived <= 0) {
+            disconnectClient(socket);
+            continue;
+        }
+
+        clientBuffer.resize(currentLength + bytesReceived);
+
+        tryProcessData(socket, clientBuffer, bytesReceived);
+        //  std::string msg(buffer, bytesReceived);
+        // processMessage(msg, socket);
     }
 }
 
-void Server::disconnectClient(int &i) {
-    std::string msg_disconnect("Client disconnected: " + std::to_string(m_fds[i].fd));
-    close(m_fds[i].fd);
-    m_fds.erase(m_fds.begin() + i);
+void Server::tryProcessData(int socket, std::vector<uint8_t> &buffer, int bytesReceived) {
+    while (buffer.size() >= sizeof(Proto::PacketHeader)) {
+        Proto::PacketHeader hdr;
+        memcpy(&hdr, buffer.data(), sizeof(hdr));
+
+        uint16_t payloadSize = ntohs(hdr.length);
+
+        if (buffer.size() < sizeof(hdr) + payloadSize)
+            break;
+
+        // uint8_t *payload = buffer.data() + sizeof(hdr);
+        std::vector<uint8_t> payload(buffer.begin() + sizeof(hdr),
+                                     buffer.begin() + sizeof(hdr) + payloadSize);
+
+        // process packet
+        // processPacket(hdr.id)
+        switch (hdr.id) {
+        case Proto::ID::MESSAGE: {
+            Proto::Message msg = Proto::Message::deserialize(payload);
+            std::cout << msg.message << " " << std::to_string(payloadSize) << std::endl;
+            broadcastMessage(msg.message);
+            break;
+        }
+        default:
+            break;
+        }
+
+        buffer.erase(buffer.begin(), buffer.begin() + sizeof(hdr) + payloadSize);
+    }
+}
+
+void Server::disconnectClient(int &socket) {
+    std::string msg_disconnect("Client disconnected: " + std::to_string(m_fds[socket].fd));
+    close(m_fds[socket].fd);
+    m_fds.erase(m_fds.begin() + socket);
+    m_clientBuffers.erase(socket);
 
     // we reduce i by 1 so the handleConnections loop doesn't skip over the next client in the
     // shortened m_fds array
-    i--;
+    socket--;
 
     std::cout << msg_disconnect << std::endl;
     broadcastMessage(msg_disconnect);
 }
 
-void Server::connectClient(int clientSocket) {
-    std::string msg_connect("Client connected: " + std::to_string(clientSocket));
+void Server::connectClient(int socket) {
+    std::string msg_connect("Client connected: " + std::to_string(socket));
     pollfd      clientPoll{};
-    clientPoll.fd     = clientSocket;
+    clientPoll.fd     = socket;
     clientPoll.events = POLLIN;
     m_fds.push_back(clientPoll);
+    m_clientBuffers[socket] = std::vector<uint8_t>(1024);
 
     std::cout << msg_connect << std::endl;
     broadcastMessage(msg_connect);
