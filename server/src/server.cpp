@@ -1,12 +1,8 @@
 #include "server.hpp"
 #include "protocol.hpp"
-#include <chrono>
 #include <format>
-#include <functional>
 #include <iostream>
-#include <mutex>
 
-std::mutex coutMutex;
 Server::Server(std::optional<int> port) {
     // std::signal(SIGINT, stop);
     // std::signal(SIGHUP, stop);
@@ -43,36 +39,13 @@ Server::Server(std::optional<int> port) {
 
 void Server::run() {
     std::cout << "Server is running on port " << m_serverPort << std::endl;
-    while (running) {
+    while (m_running) {
         int events = poll(m_fds.data(), m_fds.size(), 1000);
         if (events < 0) {
             perror("poll");
             break;
         }
         handleConnections(m_fds);
-    }
-}
-
-/*
-static void Server::stop(int signal) {
-    std::cout << "Closing the server..." << std::endl;
-    running = 0;
-    for (auto &s : m_fds) {
-        if (s.fd != -1) {
-            close(s.fd);
-            s.fd = -1;
-        }
-    }
-}
-*/
-
-void Server::workerFunc() {
-    while (running) {
-        {
-            std::lock_guard<std::mutex> lock(coutMutex);
-            std::cout << "Thread " << std::this_thread::get_id() << std::endl;
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 }
 
