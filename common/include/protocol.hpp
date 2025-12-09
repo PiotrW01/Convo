@@ -40,18 +40,45 @@ struct LoginRequest {
 };
 
 struct Message {
+    std::string username;
     std::string message;
 
     std::vector<uint8_t> serialize() const {
-        return std::vector<uint8_t>(message.begin(), message.end());
+        std::vector<uint8_t> payload;
+
+        uint8_t unameLength = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
+        payload.push_back(unameLength);
+        payload.insert(payload.end(), username.begin(), username.begin() + unameLength);
+        payload.insert(payload.end(), message.begin(), message.end());
+
+        return payload;
     }
 
-    static std::vector<uint8_t> serialize(const std::string &message) {
-        return std::vector<uint8_t>(message.begin(), message.end());
+    static std::vector<uint8_t> serialize(const std::string &username, const std::string &message) {
+        std::vector<uint8_t> payload;
+
+        uint8_t unameLength = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
+        payload.push_back(unameLength);
+        payload.insert(payload.end(), username.begin(), username.begin() + unameLength);
+        payload.insert(payload.end(), message.begin(), message.end());
+
+        return payload;
     }
 
     static Message deserialize(const std::vector<uint8_t> &data) {
-        return Message{std::string(data.begin(), data.end())};
+        Message msg;
+
+        if (data.empty())
+            return msg;
+
+        uint8_t unameLength = data[0];
+        if (data.size() < 1 + unameLength)
+            return msg;
+        // ! TODO: need to add sanity check data.size() >= 1 + unameLength
+        msg.username = std::string(data.begin() + 1, data.begin() + 1 + unameLength);
+        msg.message  = std::string(data.begin() + 1 + unameLength, data.end());
+
+        return msg;
     }
 };
 
