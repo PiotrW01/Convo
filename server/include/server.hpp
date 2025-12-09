@@ -1,5 +1,6 @@
 #pragma once
 
+#include "client_connection.hpp"
 #include <atomic>
 #include <csignal>
 #include <netinet/in.h>
@@ -8,16 +9,20 @@
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
+#include <unordered_map>
 #include <vector>
 
 class Server {
   private:
     // std::thread           m_workerThreads[4];
     // static Server       s_instance;
-    std::atomic<bool>   running        = 1;
-    int                 m_serverSocket = -1;
-    int                 m_serverPort   = 7777;
-    std::vector<pollfd> m_fds;
+    std::atomic<bool>                             running        = 1;
+    int                                           m_serverSocket = -1;
+    int                                           m_serverPort   = 7777;
+    std::vector<pollfd>                           m_fds;
+    std::unordered_map<int, std::vector<uint8_t>> m_clientBuffers;
+    pollfd                                        m_serverPoll;
+    // std::vector<ClientConnection> clients;
 
   private:
     void workerFunc();
@@ -26,6 +31,7 @@ class Server {
     void handleConnections(std::vector<pollfd> &m_fds);
     void disconnectClient(int &i);
     void connectClient(int clientSocket);
+    void tryProcessData(int socket, std::vector<uint8_t> &clientBuffer, int bytesReceived);
 
   public:
     int exitCode = 0;
