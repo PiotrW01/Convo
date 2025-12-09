@@ -1,14 +1,6 @@
-#include <iostream>
-
-#include "ftxui/component/component.hpp"
+#include "client.hpp"
 #include "protocol.hpp"
 #include <cerrno>
-#include <string>
-#include <sys/socket.h>
-#include <thread>
-#include <unistd.h>
-
-#include "client.hpp"
 
 Client::Client() {
     m_socket                        = socket(AF_INET, SOCK_STREAM, 0);
@@ -64,10 +56,11 @@ void Client::run() {
                     if (msg.username.starts_with('!'))
                         m_interface.printMessage(msg.message, msg.username,
                                                  ftxui::color(ftxui::Color::RedLight));
-                    else if (msg.username == m_session.username)
+                    else if (msg.username == m_session.username) {
                         m_interface.printMessage(msg.message, msg.username,
                                                  ftxui::color(ftxui::Color::Cyan));
-                    else
+                        m_interface.scrollDown();
+                    } else
                         m_interface.printMessage(msg.message, msg.username);
                     break;
                 }
