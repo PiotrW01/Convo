@@ -1,4 +1,5 @@
 #pragma once
+#include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <functional>
 #include <string>
@@ -16,8 +17,11 @@ class ClientInterface {
 
   public:
     ClientInterface();
+    void                               refresh();
     std::function<void(std::string &)> on_enter_cb;
 
-    void printMessage(const std::string &msg);
+    ftxui::Component
+         printMessage(const std::string &msg, const std::string &user = "System",
+                      ftxui::Decorator namecolor = ftxui::color(ftxui::Color::GrayLight));
     void init();
 };

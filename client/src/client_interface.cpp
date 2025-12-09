@@ -2,6 +2,7 @@
 #include "ftxui/component/component.hpp"
 #include "ftxui/component/screen_interactive.hpp"
 #include "ftxui/dom/elements.hpp"
+#include <format>
 
 using namespace ftxui;
 
@@ -24,17 +25,24 @@ ClientInterface::ClientInterface() : m_screen(ScreenInteractive::Fullscreen()) {
                              .align_items     = FlexboxConfig::AlignItems::FlexStart,
                          }) |
                  flex;
-        return yframe(f);
+        return f | focusPositionRelative(0, 1) | yframe | vscroll_indicator;
         // return vbox(elems) | flex;
     });
 }
 
-void ClientInterface::printMessage(const std::string &msg) {
+void ClientInterface::refresh() {
+    m_screen.PostEvent(Event::Custom);
+}
+
+Component ClientInterface::printMessage(const std::string &msg, const std::string &user,
+                                        Decorator nameColor) {
     std::string str = msg;
-    auto        t   = Renderer(
-        [str] { return vbox({paragraph("[User]") | color(Color::Red), paragraph(" " + str)}); });
+    auto        t   = Renderer([str, user, nameColor] {
+        return vbox({paragraph(std::format("[{}]", user)) | nameColor, paragraph(" " + str)});
+    });
     messages_container->Add(t);
     m_screen.PostEvent(Event::Custom);
+    return t;
 }
 
 void ClientInterface::init() {
