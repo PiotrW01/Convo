@@ -25,31 +25,22 @@ void Client::run() {
             m_interface.on_enter_cb = [this](std::string &msg) { msg = ""; };
             return;
         }
+        m_session.status = ClientSession::CONNECTED;
+        auto msg         = m_interface.print_message("Enter your username:");
 
-        auto msg = m_interface.print_message("Enter your username:");
-
-        m_session.status             = ClientSession::CONNECTED;
-        std::vector<uint8_t> &buffer = m_session.buffer;
+        Proto::Bytes &buffer = m_session.buffer;
         while (true) {
-            std::vector<uint8_t> temp(8192);
-            int                  bytes_received = recv(m_socket, temp.data(), temp.size(), 0);
-            if (bytes_received <= 0) {
+            int bytes = Proto::receive_data(m_socket, buffer);
+            if (bytes <= 0)
                 break;
-            }
-            buffer.insert(buffer.end(), temp.begin(), temp.begin() + bytes_received);
 
-            while (buffer.size() >= sizeof(Proto::PacketHeader)) {
-                Proto::PacketHeader hdr;
-                memcpy(&hdr, buffer.data(), sizeof(hdr));
-
-                uint16_t payload_size = ntohs(hdr.length);
-
-                if (buffer.size() < sizeof(hdr) + payload_size)
+            while (Proto::is_header_ready(buffer)) {
+                Proto::PacketHeader hdr(buffer, Proto::Endianness::NETWORK_TO_HOST);
+                Proto::PayloadSize  payload_size = hdr.length;
+                if (!Proto::is_packet_ready(buffer, payload_size))
                     break;
 
-                std::vector<uint8_t> payload(buffer.begin() + sizeof(hdr),
-                                             buffer.begin() + sizeof(hdr) + payload_size);
-
+                Proto::Payload payload = Proto::get_payload(buffer, payload_size);
                 switch (hdr.id) {
                 case Proto::ID::MESSAGE: {
                     Proto::Message msg = Proto::Message::deserialize(payload);
@@ -66,9 +57,8 @@ void Client::run() {
                 }
                 case Proto::LOGIN: {
                     Proto::LoginRequest res = Proto::LoginRequest::deserialize(payload);
-                    m_interface.print_message("logged in!");
-                    m_session.status   = ClientSession::LOGGED_IN;
-                    m_session.username = res.username;
+                    m_session.status        = ClientSession::LOGGED_IN;
+                    m_session.username      = res.username;
                     msg->Detach();
                     break;
                 }
@@ -76,7 +66,7 @@ void Client::run() {
                     break;
                 }
 
-                buffer.erase(buffer.begin(), buffer.begin() + sizeof(hdr) + payload_size);
+                Proto::remove_packet(buffer, payload_size);
             }
         }
         close(m_socket);
@@ -86,17 +76,16 @@ void Client::run() {
 }
 
 void Client::send_message(std::string &msg) {
+    Proto::Payload payload;
+
     if (m_session.status == ClientSession::CONNECTED) {
-        std::vector<uint8_t> payload = Proto::LoginRequest::serialize(msg);
-        Proto::PacketHeader  hdr(Proto::ID::LOGIN, payload.size());
-        send(m_socket, &hdr, sizeof(hdr), 0);
-        send(m_socket, payload.data(), payload.size(), 0);
+        m_interface.print_message("sending");
+        Proto::Payload payload = Proto::LoginRequest::serialize(msg);
+        Proto::send_packet(m_socket, payload, Proto::ID::LOGIN);
         return;
     } else if (m_session.status == ClientSession::LOGGED_IN) {
         // send(clientSocket, msg.data(), msg.length(), 0);
-        std::vector<uint8_t> payload = Proto::Message::serialize("", msg);
-        Proto::PacketHeader  hdr(Proto::ID::MESSAGE, payload.size());
-        send(m_socket, &hdr, sizeof(hdr), 0);
-        send(m_socket, payload.data(), payload.size(), 0);
+        Proto::Payload payload = Proto::Message::serialize("", msg);
+        Proto::send_packet(m_socket, payload, Proto::ID::MESSAGE);
     }
 }
