@@ -1,7 +1,6 @@
 #pragma once
 
 #include "client_session.hpp"
-#include "protocol.hpp"
 #include <atomic>
 #include <optional>
 #include <poll.h>
@@ -19,11 +18,9 @@ class Server {
   private:
     void broadcast_message(const Proto::Message &msg);
     void handle_connections(std::vector<pollfd> &m_fds);
-    void try_process_data(int fd, std::vector<uint8_t> &client_buffer);
+    void try_process_data(int fd, Proto::Bytes &client_buffer);
     void connect_client(int client_socket);
     void disconnect_client(int &it);
-    void send_packet(const int &fd, const Proto::PacketHeader &hdr,
-                     const std::vector<uint8_t> payload);
 
   public:
     Server(std::optional<int> port);

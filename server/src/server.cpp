@@ -1,5 +1,4 @@
 #include "server.hpp"
-#include "protocol.hpp"
 #include <format>
 #include <iostream>
 
@@ -32,9 +31,6 @@ Server::Server(std::optional<int> port) {
     m_server_poll.fd     = m_server_socket;
     m_server_poll.events = POLLIN;
     m_fds.push_back(m_server_poll);
-    //  for (std::thread &t : m_workerThreads) {
-    //      t = std::thread(std::bind(&Server::workerFunc, this));
-    //  }
 }
 
 void Server::run() {
@@ -50,22 +46,16 @@ void Server::run() {
 }
 
 void Server::broadcast_message(const Proto::Message &msg) {
-    std::vector<uint8_t> payload = msg.serialize();
-    Proto::PacketHeader  hdr(Proto::ID::MESSAGE, payload.size());
+    Proto::Payload      payload = msg.serialize();
+    Proto::PacketHeader hdr(Proto::ID::MESSAGE, payload.size(), Proto::Endianness::HOST_TO_NETWORK);
 
     std::cout << std::format("[{}] ", msg.username) << msg.message << std::endl;
 
     for (auto &client : m_fds) {
         if (client.fd == m_server_socket)
             continue;
-        send_packet(client.fd, hdr, payload);
+        Proto::send_packet(client.fd, payload, hdr);
     }
-}
-
-void Server::send_packet(const int &fd, const Proto::PacketHeader &hdr,
-                         const std::vector<uint8_t> payload) {
-    send(fd, &hdr, sizeof(hdr), 0);
-    send(fd, payload.data(), payload.size(), 0);
 }
 
 void Server::handle_connections(std::vector<pollfd> &m_fds) {
@@ -81,37 +71,25 @@ void Server::handle_connections(std::vector<pollfd> &m_fds) {
             continue;
         }
 
-        std::vector<uint8_t> temp(8192);
-        int                  bytesReceived = recv(m_fds[it].fd, temp.data(), temp.size(), 0);
-        if (bytesReceived <= 0) {
+        auto &client_buffer  = m_client_sessions[m_fds[it].fd].buffer;
+        int   bytes_received = Proto::receive_data(m_fds[it].fd, client_buffer);
+        if (bytes_received <= 0) {
             disconnect_client(it);
             continue;
         }
-
-        auto &client_buffer = m_client_sessions[m_fds[it].fd].buffer;
-        client_buffer.insert(client_buffer.end(), temp.begin(), temp.begin() + bytesReceived);
-
         try_process_data(m_fds[it].fd, client_buffer);
-        //  std::string msg(buffer, bytesReceived);
-        // processMessage(msg, socket);
     }
 }
 
-void Server::try_process_data(int fd, std::vector<uint8_t> &buffer) {
-    while (buffer.size() >= sizeof(Proto::PacketHeader)) {
-        Proto::PacketHeader hdr;
-        memcpy(&hdr, buffer.data(), sizeof(hdr));
+void Server::try_process_data(int fd, Proto::Bytes &buffer) {
+    while (Proto::is_header_ready(buffer)) {
+        Proto::PacketHeader hdr(buffer, Proto::Endianness::NETWORK_TO_HOST);
+        Proto::PayloadSize  payload_size = hdr.length;
 
-        uint16_t payload_size = ntohs(hdr.length);
-
-        if (buffer.size() < sizeof(hdr) + payload_size)
+        if (!Proto::is_packet_ready(buffer, payload_size))
             break;
 
-        // uint8_t *payload = buffer.data() + sizeof(hdr);
-        std::vector<uint8_t> payload(buffer.begin() + sizeof(hdr),
-                                     buffer.begin() + sizeof(hdr) + payload_size);
-        // process packet
-        // processPacket(hdr.id)
+        Proto::Payload payload = Proto::get_payload(buffer, payload_size);
         switch (hdr.id) {
         case Proto::ID::MESSAGE: {
             Proto::Message msg = Proto::Message::deserialize(payload);
@@ -133,8 +111,7 @@ void Server::try_process_data(int fd, std::vector<uint8_t> &buffer) {
             msg.username = "Server";
             msg.message  = std::format("{} joined the channel.", req.username);
 
-            Proto::PacketHeader hdr(Proto::LOGIN, payload.size());
-            send_packet(fd, hdr, payload);
+            Proto::send_packet(fd, payload, Proto::ID::LOGIN);
             broadcast_message(msg);
             break;
         }
@@ -142,7 +119,7 @@ void Server::try_process_data(int fd, std::vector<uint8_t> &buffer) {
             break;
         }
 
-        buffer.erase(buffer.begin(), buffer.begin() + sizeof(hdr) + payload_size);
+        Proto::remove_packet(buffer, payload_size);
     }
 }
 
