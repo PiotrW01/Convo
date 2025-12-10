@@ -9,10 +9,10 @@ class Client {
     ClientSession   m_session;
     ClientInterface m_interface;
     int             m_socket;
-    sockaddr_in     m_serverAddress;
+    sockaddr_in     m_server_address;
 
   public:
     Client();
     void run();
-    void sendMessage(std::string &msg);
+    void send_message(std::string &msg);
 };

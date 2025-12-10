@@ -14,9 +14,9 @@ class ClientInterface {
     float                    m_scroll_offset = 1.0f;
 
   private:
-    ftxui::Component createMainContainer();
-    void             styleInput();
-    void             styleMessages();
+    ftxui::Component create_main_container();
+    void             style_input();
+    void             style_messages();
 
   public:
     std::function<void(std::string &)> on_enter_cb;
@@ -26,8 +26,8 @@ class ClientInterface {
     ClientInterface();
     void init();
     void refresh();
-    void scrollDown();
+    void scroll_down();
     ftxui::Component
-    printMessage(const std::string &msg, const std::string &user = "System",
-                 ftxui::Decorator namecolor = ftxui::color(ftxui::Color::GrayLight));
+    print_message(const std::string &msg, const std::string &user = "System",
+                  ftxui::Decorator name_color = ftxui::color(ftxui::Color::GrayLight));
 };

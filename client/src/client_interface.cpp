@@ -2,20 +2,20 @@
 
 using namespace ftxui;
 
-void ClientInterface::styleInput() {
+void ClientInterface::style_input() {
     InputOption opt;
     opt.multiline = false;
     opt.on_enter  = [this] { on_enter_cb(user_input); };
     opt.transform = [](InputState state) {
         Element element = state.element;
         if (state.focused) {
-            Color textColor;
+            Color text_color;
             if (state.is_placeholder)
-                textColor = Color(122, 122, 122);
+                text_color = Color(122, 122, 122);
             else
-                textColor = Color(230, 230, 230);
+                text_color = Color(230, 230, 230);
 
-            return element | bgcolor(Color(0xff, 0, 0, 20)) | color(textColor) | bold;
+            return element | bgcolor(Color(0xff, 0, 0, 20)) | color(text_color) | bold;
         } else {
             return element | bgcolor(Color::Black) | color(Color::GrayLight);
         }
@@ -25,7 +25,7 @@ void ClientInterface::styleInput() {
                         color(Color(0xff, 0x8f, 0xa6)) | size(HEIGHT, EQUAL, 3);
 }
 
-void ClientInterface::styleMessages() {
+void ClientInterface::style_messages() {
     m_messages_container = Container::Vertical({});
     m_messages_renderer  = Renderer(m_messages_container, [&] {
         Elements elems;
@@ -52,8 +52,8 @@ void ClientInterface::styleMessages() {
     });
 }
 
-Component ClientInterface::createMainContainer() {
-    std::function<bool(Event)> scrollCB = [this](Event event) {
+Component ClientInterface::create_main_container() {
+    std::function<bool(Event)> scroll_callback = [this](Event event) {
         if (event.is_mouse()) {
             // printMessage("wheel uppies!");
             if (event.mouse().button == Mouse::Button::WheelUp) {
@@ -73,27 +73,27 @@ Component ClientInterface::createMainContainer() {
                separator,
                m_input_component,
            }) |
-           bgcolor(Color(0x0f, 0x00, 0x20)) | CatchEvent(scrollCB);
+           bgcolor(Color(0x0f, 0x00, 0x20)) | CatchEvent(scroll_callback);
 }
 
 ClientInterface::ClientInterface() : m_screen(ScreenInteractive::Fullscreen()) {
-    styleInput();
-    styleMessages();
+    style_input();
+    style_messages();
 }
 
 void ClientInterface::refresh() {
     m_screen.PostEvent(Event::Custom);
 }
 
-void ClientInterface::scrollDown() {
+void ClientInterface::scroll_down() {
     m_scroll_offset = 1.0f;
 }
 
-Component ClientInterface::printMessage(const std::string &msg, const std::string &user,
-                                        Decorator nameColor) {
+Component ClientInterface::print_message(const std::string &msg, const std::string &user,
+                                         Decorator name_color) {
     std::string str     = msg;
-    auto        message = Renderer([str, user, nameColor] {
-        return vbox({paragraph(std::format("[{}]", user)) | nameColor, paragraph(" " + str)}) |
+    auto        message = Renderer([str, user, name_color] {
+        return vbox({paragraph(std::format("[{}]", user)) | name_color, paragraph(" " + str)}) |
                borderStyled(Color(0xff, 0x8f, 0xa6)) | xflex;
     });
     m_messages_container->Add(message);
@@ -102,7 +102,7 @@ Component ClientInterface::printMessage(const std::string &msg, const std::strin
 }
 
 void ClientInterface::init() {
-    auto cont = createMainContainer();
+    auto cont = create_main_container();
     m_input_component->TakeFocus();
     m_screen.Loop(cont);
 }

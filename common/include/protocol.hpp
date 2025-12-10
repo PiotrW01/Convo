@@ -46,9 +46,9 @@ struct Message {
     std::vector<uint8_t> serialize() const {
         std::vector<uint8_t> payload;
 
-        uint8_t unameLength = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
-        payload.push_back(unameLength);
-        payload.insert(payload.end(), username.begin(), username.begin() + unameLength);
+        uint8_t username_Length = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
+        payload.push_back(username_Length);
+        payload.insert(payload.end(), username.begin(), username.begin() + username_Length);
         payload.insert(payload.end(), message.begin(), message.end());
 
         return payload;
@@ -57,9 +57,9 @@ struct Message {
     static std::vector<uint8_t> serialize(const std::string &username, const std::string &message) {
         std::vector<uint8_t> payload;
 
-        uint8_t unameLength = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
-        payload.push_back(unameLength);
-        payload.insert(payload.end(), username.begin(), username.begin() + unameLength);
+        uint8_t username_length = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
+        payload.push_back(username_length);
+        payload.insert(payload.end(), username.begin(), username.begin() + username_length);
         payload.insert(payload.end(), message.begin(), message.end());
 
         return payload;
@@ -71,12 +71,11 @@ struct Message {
         if (data.empty())
             return msg;
 
-        uint8_t unameLength = data[0];
-        if (data.size() < 1 + unameLength)
+        uint8_t username_length = data[0];
+        if (data.size() < 1 + username_length)
             return msg;
-        // ! TODO: need to add sanity check data.size() >= 1 + unameLength
-        msg.username = std::string(data.begin() + 1, data.begin() + 1 + unameLength);
-        msg.message  = std::string(data.begin() + 1 + unameLength, data.end());
+        msg.username = std::string(data.begin() + 1, data.begin() + 1 + username_length);
+        msg.message  = std::string(data.begin() + 1 + username_length, data.end());
 
         return msg;
     }
