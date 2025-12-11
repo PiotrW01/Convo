@@ -1,6 +1,6 @@
 #pragma once
+#include "fmt/format.h"
 #include <cstdint>
-#include <format>
 #include <iostream>
 #include <mutex>
 
@@ -18,7 +18,7 @@ class Logger {
 
     static inline void client_message(const std::string &client, const std::string &msg) {
         std::lock_guard<std::mutex> lock(get_mutex());
-        std::cout << std::format("\033[90m[ MESS ] {} | {}\033[0m", client, msg) << std::endl;
+        std::cout << fmt::format("\033[90m[ MESS ] {} | {}\033[0m", client, msg) << std::endl;
     };
 
     static inline void info(const std::string &msg) {

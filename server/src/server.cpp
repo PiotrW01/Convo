@@ -1,7 +1,7 @@
 #include "server.hpp"
 #include "logger.hpp"
-#include <format>
 #include <iostream>
+#include <unistd.h>
 
 Server::Server(std::optional<int> port) {
     // std::signal(SIGINT, stop);
@@ -35,11 +35,7 @@ Server::Server(std::optional<int> port) {
 }
 
 void Server::run() {
-    Logger::server_message(std::format("Server is running on port {}", m_server_port));
-    Logger::info(std::format("Server is running on port {}", m_server_port));
-    Logger::warn(std::format("Server is running on port {}", m_server_port));
-    Logger::error(std::format("Server is running on port {}", m_server_port));
-    Logger::client_message("glob", std::format("Server is running on port {}", m_server_port));
+    Logger::server_message(fmt::format("Server is running on port {}", m_server_port));
     while (m_running) {
         int events = poll(m_fds.data(), m_fds.size(), 1000);
         if (events < 0) {
@@ -113,7 +109,7 @@ void Server::try_process_data(int fd, Proto::Bytes &buffer) {
 
             Proto::Message msg;
             msg.username = "Server";
-            msg.message  = std::format("{} joined the channel.", req.username);
+            msg.message  = fmt::format("{} joined the channel.", req.username);
 
             Proto::send_packet(fd, payload, Proto::ID::LOGIN);
             Logger::server_message(msg.message);
@@ -130,7 +126,7 @@ void Server::try_process_data(int fd, Proto::Bytes &buffer) {
 
 void Server::disconnect_client(int &it) {
     std::string msg_disconnect(
-        std::format("{} left the channel.", m_client_sessions[m_fds[it].fd].username));
+        fmt::format("{} left the channel.", m_client_sessions[m_fds[it].fd].username));
     close(m_fds[it].fd);
     m_client_sessions.erase(m_fds[it].fd);
     m_fds.erase(m_fds.begin() + it);
@@ -156,5 +152,5 @@ void Server::connect_client(int fd) {
     session.status        = ClientSession::CONNECTED;
     m_client_sessions[fd] = session;
 
-    Logger::info(std::format("Client connected with id: {}", fd));
+    Logger::info(fmt::format("Client connected with id: {}", fd));
 }

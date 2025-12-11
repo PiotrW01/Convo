@@ -1,6 +1,7 @@
 #include "client.hpp"
 #include "protocol.hpp"
 #include <cerrno>
+#include <unistd.h>
 
 Client::Client() : m_interface(*this) {
 
@@ -8,6 +9,7 @@ Client::Client() : m_interface(*this) {
     m_server_address.sin_family      = AF_INET;
     m_server_address.sin_port        = htons(7777);
     m_server_address.sin_addr.s_addr = INADDR_ANY;
+    inet_pton(AF_INET, "192.168.31.166", &m_server_address.sin_addr);
 }
 
 void Client::run_connection() {
@@ -35,7 +37,7 @@ void Client::on_login_request_cb(const int fd, const Proto::LoginRequest &req) {
     m_interface.clear_messages();
 };
 void Client::on_message_cb(const int fd, const Proto::Message &req) {
-    if (req.username.starts_with('!'))
+    if (req.username.at(0) == '!')
         m_interface.print_message(req.message, req.username, ftxui::color(ftxui::Color::RedLight));
     else if (req.username == session.username) {
         m_interface.print_message(req.message, req.username, ftxui::color(ftxui::Color::Cyan));

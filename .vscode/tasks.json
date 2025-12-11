@@ -4,7 +4,7 @@
     {
       "label": "Build debug client",
       "type": "shell",
-      "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug . && cmake --build build --target client",
+      "command": "cmake -B build -DCMAKE_C_COMPILER=/usr/bin/gcc-12 -DCMAKE_CXX_COMPILER=/usr/bin/g++-12 -DCMAKE_BUILD_TYPE=Debug . && cmake --build build --target client",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -14,7 +14,7 @@
 	{
       "label": "Build debug server",
       "type": "shell",
-      "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug . && cmake --build build --target server",
+      "command": "cmake -B build -DCMAKE_C_COMPILER=/usr/bin/gcc-12 -DCMAKE_CXX_COMPILER=/usr/bin/g++-12 -DCMAKE_BUILD_TYPE=Debug . && cmake --build build --target server",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -24,7 +24,7 @@
 	{
       "label": "Build client",
       "type": "shell",
-      "command": "cmake --build build --target client",
+      "command": "cmake --build build -DCMAKE_C_COMPILER=/usr/bin/gcc-12 -DCMAKE_CXX_COMPILER=/usr/bin/g++-12 --target client",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -34,7 +34,7 @@
 	{
       "label": "Build server",
       "type": "shell",
-      "command": "cmake --build build --target server",
+      "command": "cmake --build build -DCMAKE_C_COMPILER=/usr/bin/gcc-12 -DCMAKE_CXX_COMPILER=/usr/bin/g++-12 --target server",
       "options": {
         "cwd": "${workspaceFolder}"
       },

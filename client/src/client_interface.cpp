@@ -1,5 +1,6 @@
 #include "client_interface.hpp"
 #include "client.hpp"
+#include "fmt/format.h"
 
 using namespace ftxui;
 
@@ -112,7 +113,7 @@ Component ClientInterface::print_message(const std::string &msg, const std::stri
                                          Decorator name_color) {
     std::string str     = msg;
     auto        message = Renderer([str, user, name_color] {
-        return vbox({paragraph(std::format("[{}]", user)) | name_color, paragraph(" " + str)}) |
+        return vbox({paragraph(fmt::format("[{}]", user)) | name_color, paragraph(" " + str)}) |
                borderStyled(Color(0xff, 0x8f, 0xa6)) | xflex;
     });
     m_messages_container->Add(message);

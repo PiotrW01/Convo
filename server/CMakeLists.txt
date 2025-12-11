@@ -5,4 +5,4 @@ add_executable(server
 )
 
 target_include_directories(server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(server PRIVATE common)
+target_link_libraries(server PRIVATE common fmt)

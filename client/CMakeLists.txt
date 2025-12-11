@@ -11,4 +11,5 @@ target_link_libraries(client PRIVATE
     ftxui-component
     ftxui-dom
     ftxui-screen
+    fmt
 )
