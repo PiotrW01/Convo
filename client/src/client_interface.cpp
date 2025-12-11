@@ -1,4 +1,5 @@
 #include "client_interface.hpp"
+#include "client.hpp"
 
 using namespace ftxui;
 
@@ -23,6 +24,13 @@ void ClientInterface::style_input() {
 
     m_input_component = ftxui::Input(&user_input, "Enter message", opt) | borderRounded |
                         color(Color(0xff, 0x8f, 0xa6)) | size(HEIGHT, EQUAL, 3);
+}
+
+void ClientInterface::on_enter_cb(std::string &user_input) {
+    if (user_input.length() > 0) {
+        m_client.send_message(user_input);
+        user_input = "";
+    }
 }
 
 void ClientInterface::style_messages() {
@@ -76,7 +84,8 @@ Component ClientInterface::create_main_container() {
            bgcolor(Color(0x0f, 0x00, 0x20)) | CatchEvent(scroll_callback);
 }
 
-ClientInterface::ClientInterface() : m_screen(ScreenInteractive::Fullscreen()) {
+ClientInterface::ClientInterface(Client &client)
+    : m_screen(ScreenInteractive::Fullscreen()), m_client(client) {
     style_input();
     style_messages();
 }
@@ -87,6 +96,10 @@ void ClientInterface::refresh() {
 
 void ClientInterface::scroll_down() {
     m_scroll_offset = 1.0f;
+}
+
+void ClientInterface::clear_messages() {
+    m_messages_container->DetachAllChildren();
 }
 
 Component ClientInterface::print_message(const std::string &msg, const std::string &user,
