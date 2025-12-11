@@ -28,7 +28,13 @@ void ClientInterface::style_input() {
 
 void ClientInterface::on_enter_cb(std::string &user_input) {
     if (user_input.length() > 0) {
-        m_client.send_message(user_input);
+
+        if (m_client.session.status == ClientSession::CONNECTED) {
+            m_client.login(user_input);
+        } else {
+            m_client.send_message(user_input);
+        }
+
         user_input = "";
     }
 }
