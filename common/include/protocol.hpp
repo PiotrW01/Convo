@@ -2,7 +2,9 @@
 #include <arpa/inet.h>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Proto {
@@ -17,15 +19,6 @@ enum ID : uint8_t {
 };
 
 enum class Endianness { NETWORK_TO_HOST, HOST_TO_NETWORK };
-
-/**
- * Proto::PacketHandler, lepszą nazwe wymyślić może
- * function callback ktory otrzymuje hdr.id wraz z payload
- * albo func callback dla kazdego rodzaju pakietu ktory otrzymuje
- * gotowy skonstruowany pakiet z payload'u
- *
- * byłoby zamiast switch case od hdr.id w klience i na serverze
- */
 
 #pragma pack(push, 1)
 struct PacketHeader {
@@ -168,5 +161,74 @@ inline Payload get_payload(const Bytes &buffer, const PayloadSize &payload_size)
 inline void remove_packet(Bytes &buffer, const PayloadSize payload_size) {
     buffer.erase(buffer.begin(), buffer.begin() + sizeof(PacketHeader) + payload_size);
 }
+
+class Router {
+  public:
+    virtual void run(const int socket) = 0;
+
+    template <typename Packet> void on_packet(std::function<void(int, const Packet &)> callback) {
+        auto type_id         = typeid(Packet).hash_code();
+        m_callbacks[type_id] = [callback](int fd, const void *raw) {
+            callback(fd, *static_cast<const Packet *>(raw));
+        };
+    };
+
+    template <typename Packet> void dispatch(int fd, const Packet &packet) {
+        auto it = m_callbacks.find(typeid(Packet).hash_code());
+        if (it != m_callbacks.end()) {
+            it->second(fd, &packet);
+        }
+    }
+
+  protected:
+    std::unordered_map<size_t, std::function<void(int, const void *)>> m_callbacks;
+};
+
+class ClientRouter : public Router {
+  public:
+    void run(const int socket) override {
+        Proto::Bytes buffer;
+
+        while (true) {
+            int bytes = Proto::receive_data(socket, buffer);
+            if (bytes <= 0)
+                break;
+
+            while (Proto::is_header_ready(buffer)) {
+                Proto::PacketHeader hdr(buffer, Proto::Endianness::NETWORK_TO_HOST);
+                Proto::PayloadSize  payload_size = hdr.length;
+                if (!Proto::is_packet_ready(buffer, payload_size))
+                    break;
+
+                Proto::Payload payload = Proto::get_payload(buffer, payload_size);
+
+                switch (hdr.id) {
+                case ID::LOGIN: {
+                    LoginRequest req = LoginRequest::deserialize(payload);
+                    dispatch(0, req);
+                    break;
+                }
+                case ID::MESSAGE: {
+                    Message req = Message::deserialize(payload);
+                    dispatch(0, req);
+                    break;
+                }
+                default:
+                    break;
+                };
+
+                Proto::remove_packet(buffer, payload_size);
+            }
+        }
+    };
+};
+
+// TODO : implement
+class ServerRouter : public Router {
+  public:
+    void run(const int socket) override {
+
+    };
+};
 
 } // namespace Proto
