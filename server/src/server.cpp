@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "logger.hpp"
 #include <format>
 #include <iostream>
 
@@ -9,7 +10,7 @@ Server::Server(std::optional<int> port) {
 
     m_server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (m_server_socket == -1) {
-        std::cout << "\nCould not create server socket.\n";
+        Logger::error("\nCould not create server socket.\n");
         exit(-1);
     }
 
@@ -24,7 +25,7 @@ Server::Server(std::optional<int> port) {
          sizeof(server_address));
     int status = listen(m_server_socket, 128);
     if (status == -1) {
-        std::cout << "\nCould not start listening on server socket.\n";
+        Logger::error("\nCould not start listening on server socket.\n");
         exit(-1);
     }
 
@@ -34,7 +35,11 @@ Server::Server(std::optional<int> port) {
 }
 
 void Server::run() {
-    std::cout << "Server is running on port " << m_server_port << std::endl;
+    Logger::server_message(std::format("Server is running on port {}", m_server_port));
+    Logger::info(std::format("Server is running on port {}", m_server_port));
+    Logger::warn(std::format("Server is running on port {}", m_server_port));
+    Logger::error(std::format("Server is running on port {}", m_server_port));
+    Logger::client_message("glob", std::format("Server is running on port {}", m_server_port));
     while (m_running) {
         int events = poll(m_fds.data(), m_fds.size(), 1000);
         if (events < 0) {
@@ -48,8 +53,6 @@ void Server::run() {
 void Server::broadcast_message(const Proto::Message &msg) {
     Proto::Payload      payload = msg.serialize();
     Proto::PacketHeader hdr(Proto::ID::MESSAGE, payload.size(), Proto::Endianness::HOST_TO_NETWORK);
-
-    std::cout << std::format("[{}] ", msg.username) << msg.message << std::endl;
 
     for (auto &client : m_fds) {
         if (client.fd == m_server_socket)
@@ -94,6 +97,7 @@ void Server::try_process_data(int fd, Proto::Bytes &buffer) {
         case Proto::ID::MESSAGE: {
             Proto::Message msg = Proto::Message::deserialize(payload);
             msg.username       = m_client_sessions[fd].username;
+            Logger::client_message(msg.username, msg.message);
             broadcast_message(msg);
             break;
         }
@@ -112,6 +116,7 @@ void Server::try_process_data(int fd, Proto::Bytes &buffer) {
             msg.message  = std::format("{} joined the channel.", req.username);
 
             Proto::send_packet(fd, payload, Proto::ID::LOGIN);
+            Logger::server_message(msg.message);
             broadcast_message(msg);
             break;
         }
@@ -137,12 +142,13 @@ void Server::disconnect_client(int &it) {
     Proto::Message msg;
     msg.username = "Server";
     msg.message  = msg_disconnect;
+
+    Logger::server_message(msg_disconnect);
     broadcast_message(msg);
 }
 
 void Server::connect_client(int fd) {
-    std::string msg_connect(std::format("Client connected with id: {}", fd));
-    pollfd      client_poll{};
+    pollfd client_poll{};
     client_poll.fd     = fd;
     client_poll.events = POLLIN;
     m_fds.push_back(client_poll);
@@ -150,5 +156,5 @@ void Server::connect_client(int fd) {
     session.status        = ClientSession::CONNECTED;
     m_client_sessions[fd] = session;
 
-    std::cout << msg_connect << std::endl;
+    Logger::info(std::format("Client connected with id: {}", fd));
 }
