@@ -17,7 +17,7 @@ void Client::run_connection() {
         m_interface.print_message(strerror(errno));
         return;
     }
-    m_session.status = ClientSession::CONNECTED;
+    session.status = ClientSession::CONNECTED;
     m_interface.print_message("Enter your username:");
 
     Proto::ClientRouter router;
@@ -30,14 +30,14 @@ void Client::run_connection() {
     close(m_socket);
 }
 void Client::on_login_request_cb(const int fd, const Proto::LoginRequest &req) {
-    m_session.status   = ClientSession::LOGGED_IN;
-    m_session.username = req.username;
+    session.status   = ClientSession::LOGGED_IN;
+    session.username = req.username;
     m_interface.clear_messages();
 };
 void Client::on_message_cb(const int fd, const Proto::Message &req) {
     if (req.username.starts_with('!'))
         m_interface.print_message(req.message, req.username, ftxui::color(ftxui::Color::RedLight));
-    else if (req.username == m_session.username) {
+    else if (req.username == session.username) {
         m_interface.print_message(req.message, req.username, ftxui::color(ftxui::Color::Cyan));
         m_interface.scroll_down();
     } else
@@ -51,15 +51,14 @@ void Client::run() {
 }
 
 void Client::send_message(std::string &msg) {
-    if (m_session.status == ClientSession::LOGGED_IN) {
-        // send(clientSocket, msg.data(), msg.length(), 0);
+    if (session.status == ClientSession::LOGGED_IN) {
         Proto::Payload payload = Proto::Message::serialize("", msg);
         Proto::send_packet(m_socket, payload, Proto::ID::MESSAGE);
     }
 }
 
 void Client::login(std::string &msg) {
-    if (m_session.status == ClientSession::CONNECTED) {
+    if (session.status == ClientSession::CONNECTED) {
         Proto::Payload payload = Proto::LoginRequest::serialize(msg);
         Proto::send_packet(m_socket, payload, Proto::ID::LOGIN);
     }
