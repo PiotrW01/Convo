@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build debug client",
+      "type": "shell",
+      "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug . && cmake --build build --target client",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": "$gcc"
+    },
+	{
+      "label": "Build debug server",
+      "type": "shell",
+      "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug . && cmake --build build --target server",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": "$gcc"
+    },
+	{
+      "label": "Build client",
+      "type": "shell",
+      "command": "cmake --build build --target client",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": "$gcc"
+    },
+	{
+      "label": "Build server",
+      "type": "shell",
+      "command": "cmake --build build --target server",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": "$gcc"
+    }
+  ]
+}
