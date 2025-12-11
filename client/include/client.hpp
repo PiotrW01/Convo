@@ -7,7 +7,6 @@
 
 class Client {
   private:
-    ClientSession   m_session;
     ClientInterface m_interface;
     int             m_socket;
     sockaddr_in     m_server_address;
@@ -16,6 +15,9 @@ class Client {
     void run_connection();
     void on_login_request_cb(const int fd, const Proto::LoginRequest &req);
     void on_message_cb(const int fd, const Proto::Message &req);
+
+  public:
+    ClientSession session;
 
   public:
     Client();
