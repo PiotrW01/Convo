@@ -1,7 +1,7 @@
 #include "server.hpp"
 
 int main() {
-    Server s(std::nullopt);
+    Server s(7777);
     s.run();
     return 0;
 }
