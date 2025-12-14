@@ -1,20 +1,20 @@
 #pragma once
 #include "client_interface.hpp"
 #include "client_session.hpp"
-#include "protocol.hpp"
+#include "router.hpp"
 #include <functional>
 #include <netinet/in.h>
 
 class Client {
   private:
-    ClientInterface m_interface;
-    int             m_socket;
-    sockaddr_in     m_server_address;
+    ClientInterface     m_interface;
+    Proto::ClientRouter m_router;
 
   private:
     void run_connection();
-    void on_login_request_cb(const int fd, const Proto::LoginRequest &req);
-    void on_message_cb(const int fd, const Proto::Message &req);
+    void on_login_request_cb(const std::shared_ptr<Proto::Connection> conn,
+                             const Proto::LoginRequest               &req);
+    void on_message_cb(const std::shared_ptr<Proto::Connection> conn, const Proto::Message &req);
 
   public:
     ClientSession session;
