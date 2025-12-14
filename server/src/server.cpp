@@ -15,15 +15,22 @@ void Server::run() {
 
     m_router.use_ssl("/home/piotr/Projects/ChatTerminal/cert/server.pem",
                      "/home/piotr/Projects/ChatTerminal/cert/server.key");
-    m_router.on_packet<Proto::LoginRequest>([this](int fd, Proto::LoginRequest packet) {
-        Logger::server_message(fmt::format("A login request from {}", packet.username));
-        Proto::Message msg;
-        msg.message  = "request";
-        msg.username = "dupa";
-        broadcast_message(msg);
-    });
+    m_router.on_packet<Proto::LoginRequest>(
+        [this](std::shared_ptr<Proto::Connection> conn, Proto::LoginRequest packet) {
+            Logger::server_message(fmt::format("A login request from {}", packet.username));
+            Proto::Message msg;
+            msg.message  = "request";
+            msg.username = "hi";
+            Proto::LoginRequest req;
+            req.username = packet.username;
+            auto s       = std::make_shared<Proto::Bytes>(req.serialize());
+            conn->async_write(s);
+            broadcast_message(msg);
+        });
     m_router.on_packet<Proto::Message>(
-        [this](int fd, Proto::Message packet) { broadcast_message(packet); });
+        [this](std::shared_ptr<Proto::Connection> conn, Proto::Message packet) {
+            broadcast_message(packet);
+        });
 
     Logger::server_message(fmt::format("Server is running on port {}", 7777));
     m_router.run();
