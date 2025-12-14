@@ -11,80 +11,115 @@ class Router {
   public:
     virtual void run() = 0;
 
-    template <typename Packet> void on_packet(std::function<void(int, const Packet &)> callback) {
+    template <typename Packet>
+    void
+    on_packet(std::function<void(std::shared_ptr<Proto::Connection>, const Packet &)> callback) {
         auto type_id         = typeid(Packet).hash_code();
-        m_callbacks[type_id] = [callback](int fd, const void *raw) {
-            callback(fd, *static_cast<const Packet *>(raw));
+        m_callbacks[type_id] = [callback](std::shared_ptr<Proto::Connection> conn,
+                                          const void                        *raw) {
+            callback(conn, *static_cast<const Packet *>(raw));
         };
     };
 
-    template <typename Packet> void dispatch(int fd, const Packet &packet) {
+    template <typename Packet>
+    void dispatch(std::shared_ptr<Proto::Connection> conn, const Packet &packet) {
         auto it = m_callbacks.find(typeid(Packet).hash_code());
         if (it != m_callbacks.end()) {
-            it->second(fd, &packet);
+            it->second(conn, &packet);
         }
     }
 
   protected:
-    std::unordered_map<size_t, std::function<void(int, const void *)>> m_callbacks;
+    std::unordered_map<size_t,
+                       std::function<void(std::shared_ptr<Proto::Connection>, const void *)>>
+        m_callbacks;
 };
 
 class ClientRouter : public Router {
 
   private:
-    std::unique_ptr<Proto::Connection> m_connection;
-    bool                               m_use_ssl = false;
+    bool               m_use_ssl = false;
+    asio::io_context   m_io_context;
+    asio::ssl::context m_ctx;
 
   public:
-    void use_ssl() { m_use_ssl = true; };
-    bool connect(const std::string &ip, const std::string &port) {
-        if (m_use_ssl) {
-            // asio::io_context io_context;
-            // m_connection = std::make_unique<SSLConnection>(io_context);
-        } else {
-            // m_connection = std::make_unique<TCPConnection>();
-        }
-        bool is_connected = m_connection->init(ip, port);
-        return is_connected;
+    std::shared_ptr<Proto::Connection> server;
+    ClientRouter() : m_ctx(asio::ssl::context::tls_client) {}
+    void use_ssl() {
+        m_ctx.set_default_verify_paths();
+        m_ctx.set_verify_mode(asio::ssl::context_base::verify_none);
+        m_use_ssl = true;
     };
-    void run() override {
-        Proto::Bytes buffer;
+    void connect(const std::string &ip, const std::string &port) {
+        auto socket = std::make_shared<asio::ip::tcp::socket>(m_io_context);
 
-        while (true) {
-            int bytes = 0;
-            if (bytes <= 0)
+        if (m_use_ssl) {
+            auto ssl_conn = std::make_shared<SSLConnection>(std::move(*socket), m_ctx);
+            ssl_conn->connect(ip, port);
+            ssl_conn->stream().async_handshake(
+                asio::ssl::stream_base::client,
+                [this, ssl_conn](const asio::error_code &handshake_ec) {
+                    if (!handshake_ec) {
+                        int fd       = ssl_conn->stream().next_layer().native_handle();
+                        ssl_conn->fd = fd;
+                        client_loop(ssl_conn);
+                    }
+                });
+
+            server = ssl_conn;
+        } else {
+            server = std::make_unique<TCPConnection>(std::move(*socket));
+            server->connect(ip, port);
+            client_loop(server);
+        }
+        m_io_context.run();
+    };
+    void client_loop(std::shared_ptr<Proto::Connection> conn) {
+        auto temp         = std::make_shared<Proto::Bytes>(8192);
+        auto read_handler = [this, conn, temp](const asio::error_code &ec, std::size_t bytes_recv) {
+            if (!ec && bytes_recv > 0) {
+                auto read_buffer = conn->read_buffer;
+                read_buffer->insert(read_buffer->end(), temp->begin(), temp->begin() + bytes_recv);
+                process_buffer(conn, *read_buffer);
+                client_loop(conn);
+            } else {
+                // m_io_context.shutdown();
+            }
+        };
+        conn->async_read(temp, read_handler);
+    };
+
+    void process_buffer(std::shared_ptr<Proto::Connection> conn, Proto::Bytes &read_buffer) {
+        while (Proto::is_header_ready(read_buffer)) {
+            Proto::PacketHeader hdr(read_buffer, Proto::Endianness::NETWORK_TO_HOST);
+            Proto::PayloadSize  payload_size = hdr.payload_size;
+            if (!Proto::is_packet_ready(read_buffer, payload_size))
                 break;
 
-            while (Proto::is_header_ready(buffer)) {
-                Proto::PacketHeader hdr(buffer, Proto::Endianness::NETWORK_TO_HOST);
-                Proto::PayloadSize  payload_size = hdr.payload_size;
-                if (!Proto::is_packet_ready(buffer, payload_size))
-                    break;
+            Proto::Payload payload = Proto::get_payload(read_buffer, payload_size);
 
-                Proto::Payload payload = Proto::get_payload(buffer, payload_size);
-
-                switch (hdr.id) {
-                case Proto::PACKET_ID::LOGIN: {
-                    Proto::LoginRequest req;
-                    req.deserialize(payload);
-                    dispatch(0, req);
-                    break;
-                }
-                case Proto::PACKET_ID::MESSAGE: {
-                    Proto::Message req;
-                    req.deserialize(payload);
-                    dispatch(0, req);
-                    break;
-                }
-                default:
-                    break;
-                };
-                Proto::remove_packet(buffer, payload_size);
+            switch (hdr.id) {
+            case Proto::PACKET_ID::LOGIN: {
+                Proto::LoginRequest req;
+                req.deserialize(payload);
+                dispatch(conn, req);
+                break;
             }
+            case Proto::PACKET_ID::MESSAGE: {
+                Proto::Message req;
+                req.deserialize(payload);
+                dispatch(conn, req);
+                break;
+            }
+            default:
+                break;
+            };
+            Proto::remove_packet(read_buffer, payload_size);
         }
     };
 
-    void send_packet(Proto::Packet &packet) { m_connection->write(packet.serialize()); };
+    void run() override {};
+    void send_packet(Proto::Packet &packet) { server->write(packet.serialize()); };
 };
 
 class ServerRouter : public Router {
@@ -158,7 +193,7 @@ class ServerRouter : public Router {
                 client_loop(conn);
             } else {
                 clients.erase(conn->fd);
-                Logger::server_message("Client disconnected");
+                Logger::server_message("Client disconnected " + ec.message());
             }
         };
 
@@ -178,13 +213,13 @@ class ServerRouter : public Router {
             case Proto::PACKET_ID::LOGIN: {
                 Proto::LoginRequest req;
                 req.deserialize(payload);
-                dispatch(0, req);
+                dispatch(conn, req);
                 break;
             }
             case Proto::PACKET_ID::MESSAGE: {
                 Proto::Message req;
                 req.deserialize(payload);
-                dispatch(0, req);
+                dispatch(conn, req);
                 break;
             }
             default:

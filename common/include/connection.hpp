@@ -21,11 +21,11 @@ class Connection {
     int                                fd;
     std::shared_ptr<Bytes>             read_buffer;
     std::deque<std::shared_ptr<Bytes>> write_queue;
-    virtual bool                       init(const std::string &ip, const std::string &port) = 0;
-    virtual void                       read(Bytes &buffer)                                  = 0;
-    virtual void async_read(std::shared_ptr<Bytes> buffer, ReadHandler read_handler)        = 0;
-    virtual void async_write(std::shared_ptr<Bytes> buffer)                                 = 0;
-    virtual void write(const Bytes &buffer)                                                 = 0;
+    virtual bool                       connect(const std::string &ip, const std::string &port) = 0;
+    virtual void                       read(Bytes &buffer)                                     = 0;
+    virtual void async_read(std::shared_ptr<Bytes> buffer, ReadHandler read_handler)           = 0;
+    virtual void async_write(std::shared_ptr<Bytes> buffer)                                    = 0;
+    virtual void write(const Bytes &buffer)                                                    = 0;
     asio::ip::basic_resolver_results<asio::ip::tcp> resolve_endpoints(const std::string &ip,
                                                                       const std::string &port) {
         asio::ip::tcp::resolver resolver(m_io_context);
@@ -45,11 +45,11 @@ class SSLConnection : public Connection {
 
   public:
     // * client side client constructor * //
-    SSLConnection(asio::io_context &io_context, asio::ssl::context &ctx)
-        : m_ssl_stream(io_context, ctx) {
-        ctx.set_default_verify_paths();
-        ctx.set_verify_mode(asio::ssl::verify_none);
-    };
+    // SSLConnection(asio::io_context &io_context, asio::ssl::context &ctx)
+    //     : m_ssl_stream(io_context, ctx) {
+    //     ctx.set_default_verify_paths();
+    //     ctx.set_verify_mode(asio::ssl::verify_none);
+    // };
     // * server side client constructor * //
     SSLConnection(asio::ip::tcp::socket socket, asio::ssl::context &ctx)
         : m_ssl_stream(std::move(socket), ctx) {
@@ -118,15 +118,13 @@ class SSLConnection : public Connection {
         return true;
     };
 
-    bool init(const std::string &ip, const std::string &port) override {
-        // m_ctx.set_default_verify_paths();
-        // m_ctx.set_verify_mode(asio::ssl::verify_none);
+    bool connect(const std::string &ip, const std::string &port) override {
         asio::ip::tcp::resolver resolver(m_io_context);
-
-        auto endpoints = resolve_endpoints(ip, port);
-        asio::connect(m_ssl_stream.next_layer(), endpoints);
+        auto                    endpoints = resolver.resolve(ip, port);
+        if (endpoints.empty())
+            return false;
         try {
-            m_ssl_stream.handshake(asio::ssl::stream_base::client);
+            asio::connect(m_ssl_stream.lowest_layer(), endpoints);
         } catch (asio::system_error &error) {
             return false;
         }
@@ -146,9 +144,9 @@ class TCPConnection : public Connection {
         read_buffer = std::make_shared<Bytes>();
     }
 
+    bool connect(const std::string &ip, const std::string &port) override {};
     void read(Bytes &buffer) override {};
     void write(const Bytes &buffer) override {};
-    bool init(const std::string &ip, const std::string &port) override {};
 
     void async_read(std::shared_ptr<Bytes> buffer, ReadHandler read_handler) override {
         m_socket.async_read_some(

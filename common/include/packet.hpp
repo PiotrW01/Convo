@@ -20,23 +20,6 @@ enum PACKET_ERROR : uint8_t { ERROR_HEADER_SIZE, ERROR_OTHER = 200 };
 
 enum class Endianness { NETWORK_TO_HOST, HOST_TO_NETWORK };
 
-inline bool is_header_ready(const Bytes &buffer) {
-    return (buffer.size() >= sizeof(PacketHeader));
-}
-
-inline bool is_packet_ready(const Bytes &buffer, const PayloadSize &payload_size) {
-    return buffer.size() >= sizeof(PacketHeader) + payload_size;
-}
-
-inline Payload get_payload(const Bytes &buffer, const PayloadSize &payload_size) {
-    return Payload(buffer.begin() + sizeof(PacketHeader),
-                   buffer.begin() + sizeof(PacketHeader) + payload_size);
-}
-
-inline void remove_packet(Bytes &buffer, const PayloadSize payload_size) {
-    buffer.erase(buffer.begin(), buffer.begin() + sizeof(PacketHeader) + payload_size);
-}
-
 #pragma pack(push, 1)
 struct PacketHeader {
     Proto::PACKET_ID id;
@@ -69,6 +52,23 @@ struct PacketHeader {
     }
 };
 #pragma pack(pop)
+
+inline bool is_header_ready(const Bytes &buffer) {
+    return (buffer.size() >= sizeof(PacketHeader));
+}
+
+inline bool is_packet_ready(const Bytes &buffer, const PayloadSize &payload_size) {
+    return buffer.size() >= sizeof(PacketHeader) + payload_size;
+}
+
+inline Payload get_payload(const Bytes &buffer, const PayloadSize &payload_size) {
+    return Payload(buffer.begin() + sizeof(PacketHeader),
+                   buffer.begin() + sizeof(PacketHeader) + payload_size);
+}
+
+inline void remove_packet(Bytes &buffer, const PayloadSize payload_size) {
+    buffer.erase(buffer.begin(), buffer.begin() + sizeof(PacketHeader) + payload_size);
+}
 
 struct Packet {
     virtual Bytes serialize()                       = 0;
