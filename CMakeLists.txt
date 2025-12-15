@@ -18,7 +18,11 @@ add_subdirectory(${FMT_DIR})
 
 include_directories("${CMAKE_SOURCE_DIR}/external/asio-1.36.0/include")
 
+#add_library(bcrypt STATIC external/bcrypt/bcrypt.c)
+#target_include_directories(bcrypt PUBLIC external/bcrypt)
+
 # valid build targets: common client server
+add_subdirectory(external/libbcrypt)
 add_subdirectory(common)
 add_subdirectory(client)
 add_subdirectory(server)
