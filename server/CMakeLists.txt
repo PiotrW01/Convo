@@ -14,3 +14,4 @@ target_link_libraries(server PRIVATE
         mariadbcpp
         bcrypt
         )
+
