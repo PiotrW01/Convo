@@ -12,9 +12,9 @@ class Client {
 
   private:
     void run_connection();
-    void on_login_request_cb(const std::shared_ptr<Proto::Connection> conn,
-                             const Proto::LoginRequest               &req);
-    void on_message_cb(const std::shared_ptr<Proto::Connection> conn, const Proto::Message &req);
+    void on_login_request_cb(const std::shared_ptr<Proto::Connection> &conn,
+                             const Proto::Login                       &req);
+    void on_message_cb(const std::shared_ptr<Proto::Connection> &conn, const Proto::Message &req);
 
   public:
     ClientSession session;

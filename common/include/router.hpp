@@ -12,17 +12,15 @@ class Router {
     virtual void run() = 0;
 
     template <typename Packet>
-    void
-    on_packet(std::function<void(std::shared_ptr<Proto::Connection>, const Packet &)> callback) {
+    void on_packet(std::function<void(std::shared_ptr<Proto::Connection>, Packet &)> callback) {
         auto type_id         = typeid(Packet).hash_code();
-        m_callbacks[type_id] = [callback](std::shared_ptr<Proto::Connection> conn,
-                                          const void                        *raw) {
-            callback(conn, *static_cast<const Packet *>(raw));
+        m_callbacks[type_id] = [callback](std::shared_ptr<Proto::Connection> conn, void *raw) {
+            callback(conn, *static_cast<Packet *>(raw));
         };
     };
 
     template <typename Packet>
-    void dispatch(std::shared_ptr<Proto::Connection> conn, const Packet &packet) {
+    void dispatch(std::shared_ptr<Proto::Connection> conn, Packet &packet) {
         auto it = m_callbacks.find(typeid(Packet).hash_code());
         if (it != m_callbacks.end()) {
             it->second(conn, &packet);
@@ -30,8 +28,7 @@ class Router {
     }
 
   protected:
-    std::unordered_map<size_t,
-                       std::function<void(std::shared_ptr<Proto::Connection>, const void *)>>
+    std::unordered_map<size_t, std::function<void(std::shared_ptr<Proto::Connection>, void *)>>
         m_callbacks;
 };
 
@@ -100,7 +97,7 @@ class ClientRouter : public Router {
 
             switch (hdr.id) {
             case Proto::PACKET_ID::LOGIN: {
-                Proto::LoginRequest req;
+                Proto::Login req;
                 req.deserialize(payload);
                 dispatch(conn, req);
                 break;
@@ -211,7 +208,7 @@ class ServerRouter : public Router {
 
             switch (hdr.id) {
             case Proto::PACKET_ID::LOGIN: {
-                Proto::LoginRequest req;
+                Proto::Login req;
                 req.deserialize(payload);
                 dispatch(conn, req);
                 break;
