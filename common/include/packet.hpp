@@ -12,6 +12,7 @@ using PayloadSize = uint16_t;
 
 enum PACKET_ID : uint8_t {
     LOGIN,
+    REGISTER,
     MESSAGE,
     ERROR,
 };
@@ -104,9 +105,27 @@ struct Message : Packet {
     };
 };
 
-struct LoginRequest : Packet {
+struct Login : Packet {
     std::string username;
-    LoginRequest() { hdr.id = PACKET_ID::LOGIN; };
+    Login() { hdr.id = PACKET_ID::LOGIN; };
+    Bytes serialize() override {
+        uint8_t     username_length = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
+        PayloadSize payload_size    = username_length;
+
+        hdr.payload_size = payload_size;
+        Bytes packet     = hdr.serialize();
+
+        packet.insert(packet.end(), username.begin(), username.begin() + username_length);
+        return packet;
+    };
+    void deserialize(const Bytes &payload) {
+        username = std::string(payload.begin(), payload.end());
+    }
+};
+
+struct Register : Packet {
+    std::string username;
+    Register() { hdr.id = PACKET_ID::REGISTER; };
     Bytes serialize() override {
         uint8_t     username_length = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
         PayloadSize payload_size    = username_length;
