@@ -1,5 +1,4 @@
 #!/bin/bash
-
 arg="$1"
 
 mkdir -p build

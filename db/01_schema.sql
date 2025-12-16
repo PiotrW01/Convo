@@ -1,4 +1,6 @@
-CREATE TABLE accounts (
+use convo;
+
+CREATE TABLE IF NOT EXISTS accounts (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
