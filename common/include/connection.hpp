@@ -2,6 +2,7 @@
 #include "asio.hpp"
 #include "asio/ssl.hpp"
 #include "asio/system_error.hpp"
+#include "client_session.hpp"
 #include "packet.hpp"
 #include "s_logger.hpp"
 #include <arpa/inet.h>
@@ -27,6 +28,7 @@ class Connection {
   public:
     using ReadHandler = std::function<void(const asio::error_code &, std::size_t)>;
     std::shared_ptr<Bytes> read_buffer;
+    ClientSession          client_session;
     int                    fd;
 
   public:

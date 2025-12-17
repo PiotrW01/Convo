@@ -20,6 +20,9 @@ class Server {
     void setup_routes();
     void broadcast_message(Proto::Message &msg);
     void connect_to_database();
+    void send_error(std::shared_ptr<Proto::Connection> conn, const std::string &description,
+                    Proto::PACKET_ERROR err = Proto::PACKET_ERROR::OTHER);
+    void send_message(std::shared_ptr<Proto::Connection> conn, const std::string &message);
 
   public:
     ServerConfig config() const { return m_config; };

@@ -10,14 +10,9 @@ using Payload     = std::vector<uint8_t>;
 using Bytes       = std::vector<uint8_t>;
 using PayloadSize = uint16_t;
 
-enum PACKET_ID : uint8_t {
-    LOGIN,
-    REGISTER,
-    MESSAGE,
-    ERROR,
-};
+enum PACKET_ID : uint8_t { LOGIN, REGISTER, MESSAGE, ERROR, DISCONNECT };
 
-enum PACKET_ERROR : uint8_t { ERROR_HEADER_SIZE, ERROR_OTHER = 200 };
+enum PACKET_ERROR : uint8_t { BAD_HEADER_SIZE, OTHER = 200 };
 
 enum class Endianness { NETWORK_TO_HOST, HOST_TO_NETWORK };
 
@@ -90,43 +85,71 @@ struct Message : Packet {
 
 struct Login : Packet {
     std::string username;
+    std::string password;
     Login() { hdr.id = PACKET_ID::LOGIN; };
     Bytes serialize() override {
         uint8_t     username_length = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
-        PayloadSize payload_size    = username_length;
+        uint8_t     password_length = static_cast<uint8_t>(std::min<size_t>(password.size(), 255));
+        PayloadSize payload_size    = 1 + 1 + username_length + password_length;
 
         hdr.payload_size = payload_size;
         Bytes packet     = hdr.serialize();
 
+        packet.push_back(username_length);
         packet.insert(packet.end(), username.begin(), username.begin() + username_length);
+        packet.push_back(password_length);
+        packet.insert(packet.end(), password.begin(), password.begin() + password_length);
         return packet;
     };
     void deserialize(const Bytes &payload) {
-        username = std::string(payload.begin(), payload.end());
+        size_t offset = 0;
+
+        uint8_t username_length = payload[offset++];
+        username =
+            std::string(payload.begin() + offset, payload.begin() + offset + username_length);
+        offset += username_length;
+
+        uint8_t password_length = payload[offset++];
+        password =
+            std::string(payload.begin() + offset, payload.begin() + offset + password_length);
     }
 };
 
 struct Register : Packet {
     std::string username;
+    std::string password;
     Register() { hdr.id = PACKET_ID::REGISTER; };
     Bytes serialize() override {
         uint8_t     username_length = static_cast<uint8_t>(std::min<size_t>(username.size(), 255));
-        PayloadSize payload_size    = username_length;
+        uint8_t     password_length = static_cast<uint8_t>(std::min<size_t>(password.size(), 255));
+        PayloadSize payload_size    = 1 + 1 + username_length + password_length;
 
         hdr.payload_size = payload_size;
         Bytes packet     = hdr.serialize();
 
+        packet.push_back(username_length);
         packet.insert(packet.end(), username.begin(), username.begin() + username_length);
+        packet.push_back(password_length);
+        packet.insert(packet.end(), password.begin(), password.begin() + password_length);
         return packet;
     };
     void deserialize(const Bytes &payload) {
-        username = std::string(payload.begin(), payload.end());
+        size_t offset = 0;
+
+        uint8_t username_length = payload[offset++];
+        username =
+            std::string(payload.begin() + offset, payload.begin() + offset + username_length);
+        offset += username_length;
+
+        uint8_t password_length = payload[offset++];
+        password =
+            std::string(payload.begin() + offset, payload.begin() + offset + password_length);
     }
 };
 
 struct Error : Packet {
-    uint8_t     error_code;
-    std::string error_description;
+    PACKET_ERROR error_code;
+    std::string  error_description;
     Error() { hdr.id = PACKET_ID::ERROR; };
     Bytes serialize() override {
         PayloadSize payload_size = sizeof(error_code) + error_description.size();
@@ -139,8 +162,28 @@ struct Error : Packet {
         return packet;
     };
     void deserialize(const Bytes &payload) {
-        error_code        = payload[0];
+        error_code        = static_cast<PACKET_ERROR>(payload[0]);
         error_description = std::string(payload.begin() + 1, payload.end());
+    }
+};
+
+struct Disconnect : Packet {
+    uint8_t     disconnect_code;
+    std::string disconnect_description;
+    Disconnect() { hdr.id = PACKET_ID::DISCONNECT; };
+    Bytes serialize() override {
+        PayloadSize payload_size = sizeof(disconnect_code) + disconnect_description.size();
+
+        hdr.payload_size = payload_size;
+        Bytes packet     = hdr.serialize();
+
+        packet.push_back(disconnect_code);
+        packet.insert(packet.end(), disconnect_description.begin(), disconnect_description.end());
+        return packet;
+    };
+    void deserialize(const Bytes &payload) {
+        disconnect_code        = payload[0];
+        disconnect_description = std::string(payload.begin() + 1, payload.end());
     }
 };
 

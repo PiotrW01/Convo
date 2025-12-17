@@ -57,6 +57,11 @@ class Router {
                 dispatch(conn, req);
                 break;
             }
+            case Proto::PACKET_ID::REGISTER: {
+                Proto::Register req;
+                req.deserialize(payload);
+                dispatch(conn, req);
+            }
             default:
                 break;
             };
@@ -79,27 +84,39 @@ class ClientRouter : public Router {
         m_use_ssl = true;
     };
 
-    void connect(const std::string &ip, const std::string &port) {
+    void
+    connect_and_run(const std::string &ip, const std::string &port,
+                    std::function<void(ClientSession::Status connection_status)> connection_cb) {
         auto socket = std::make_shared<asio::ip::tcp::socket>(m_io_context);
 
         if (m_use_ssl) {
             auto ssl_conn = std::make_shared<SSLConnection>(std::move(*socket), m_ctx);
-            ssl_conn->connect(ip, port);
-            ssl_conn->stream().async_handshake(
-                asio::ssl::stream_base::client,
-                [this, ssl_conn](const asio::error_code &handshake_ec) {
-                    if (!handshake_ec) {
-                        int fd       = ssl_conn->stream().next_layer().native_handle();
-                        ssl_conn->fd = fd;
-                        client_loop(ssl_conn);
-                    }
-                });
+            if (ssl_conn->connect(ip, port)) {
+                ssl_conn->stream().async_handshake(
+                    asio::ssl::stream_base::client,
+                    [this, ssl_conn, connection_cb](const asio::error_code &handshake_ec) {
+                        if (!handshake_ec) {
+                            connection_cb(ClientSession::Status::CONNECTED);
+                            int fd       = ssl_conn->stream().next_layer().native_handle();
+                            ssl_conn->fd = fd;
+                            client_loop(ssl_conn);
+                        } else {
+                            connection_cb(ClientSession::Status::HANDSHAKE_FAILED);
+                        }
+                    });
 
-            m_server = ssl_conn;
+                m_server = ssl_conn;
+            } else {
+                connection_cb(ClientSession::Status::CONNECTION_FAILED);
+            }
         } else {
             m_server = std::make_unique<TCPConnection>(std::move(*socket));
-            m_server->connect(ip, port);
-            client_loop(m_server);
+            if (m_server->connect(ip, port)) {
+                connection_cb(ClientSession::Status::CONNECTED);
+                client_loop(m_server);
+            } else {
+                connection_cb(ClientSession::Status::CONNECTION_FAILED);
+            }
         }
         m_io_context.run();
     };
