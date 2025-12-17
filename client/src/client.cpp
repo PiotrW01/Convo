@@ -52,21 +52,16 @@ void Client::run() {
 void Client::send_message(std::string &msg) {
     if (session.status == ClientSession::LOGGED_IN) {
         Proto::Message req;
-        req.username                    = "";
-        req.message                     = msg;
-        std::shared_ptr<Proto::Bytes> s = std::make_shared<Proto::Bytes>(req.serialize());
-        m_router.server->async_write(s);
+        req.username = "";
+        req.message  = msg;
+        m_router.send_packet(req);
     }
 }
 
 void Client::login(std::string &username) {
     if (session.status == ClientSession::CONNECTED) {
         Proto::Login req;
-        req.username                    = username;
-        std::shared_ptr<Proto::Bytes> s = std::make_shared<Proto::Bytes>(req.serialize());
-        m_router.server->async_write(s);
-
-        // Proto::Payload payload = Proto::LoginRequest::serialize(username);
-        // Proto::send_packet(m_socket, payload, Proto::ID::LOGIN);
+        req.username = username;
+        m_router.send_packet(req);
     }
 }

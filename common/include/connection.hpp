@@ -16,41 +16,38 @@
 
 namespace Proto {
 class Connection {
-  public:
-    using ReadHandler = std::function<void(const asio::error_code &, std::size_t)>;
-    int                                fd;
-    std::shared_ptr<Bytes>             read_buffer;
-    std::deque<std::shared_ptr<Bytes>> write_queue;
-    virtual bool                       connect(const std::string &ip, const std::string &port) = 0;
-    virtual void                       read(Bytes &buffer)                                     = 0;
-    virtual void async_read(std::shared_ptr<Bytes> buffer, ReadHandler read_handler)           = 0;
-    virtual void async_write(std::shared_ptr<Bytes> buffer)                                    = 0;
-    virtual void write(const Bytes &buffer)                                                    = 0;
+
+  private:
     asio::ip::basic_resolver_results<asio::ip::tcp> resolve_endpoints(const std::string &ip,
                                                                       const std::string &port) {
         asio::ip::tcp::resolver resolver(m_io_context);
         return resolver.resolve(ip, port);
     }
 
+  public:
+    using ReadHandler = std::function<void(const asio::error_code &, std::size_t)>;
+    std::shared_ptr<Bytes> read_buffer;
+    int                    fd;
+
+  public:
+    virtual void async_read(std::shared_ptr<Bytes> buffer, ReadHandler read_handler) = 0;
+    virtual void async_write(std::shared_ptr<Bytes> buffer)                          = 0;
+    virtual void read(Bytes &buffer)                                                 = 0;
+    virtual void write(const Bytes &buffer)                                          = 0;
+    virtual bool connect(const std::string &ip, const std::string &port)             = 0;
+
   protected:
-    asio::io_context m_io_context;
+    std::deque<std::shared_ptr<Bytes>> m_write_queue;
+    asio::io_context                   m_io_context;
+    bool                               m_writing = false;
 };
 
 class SSLConnection : public Connection {
   private:
     using SSLStream = asio::ssl::stream<asio::ip::tcp::socket>;
-    // asio::ssl::context m_ctx;
     SSLStream m_ssl_stream;
-    bool      m_writing = false;
 
   public:
-    // * client side client constructor * //
-    // SSLConnection(asio::io_context &io_context, asio::ssl::context &ctx)
-    //     : m_ssl_stream(io_context, ctx) {
-    //     ctx.set_default_verify_paths();
-    //     ctx.set_verify_mode(asio::ssl::verify_none);
-    // };
-    // * server side client constructor * //
     SSLConnection(asio::ip::tcp::socket socket, asio::ssl::context &ctx)
         : m_ssl_stream(std::move(socket), ctx) {
         read_buffer = std::make_shared<Bytes>();
@@ -78,7 +75,7 @@ class SSLConnection : public Connection {
 
     void async_write(std::shared_ptr<Bytes> buffer) {
         // m_ssl_stream.async_write_some();
-        write_queue.push_back(buffer);
+        m_write_queue.push_back(buffer);
 
         if (m_writing)
             return;
@@ -88,21 +85,21 @@ class SSLConnection : public Connection {
     };
 
     void _write() {
-        if (write_queue.empty()) {
+        if (m_write_queue.empty()) {
             m_writing = false;
             return;
         }
 
-        auto buffer = write_queue.front();
+        auto buffer = m_write_queue.front();
         asio::async_write(m_ssl_stream, asio::buffer(*buffer),
                           [this](const asio::error_code &ec, std::size_t bytes_transferred) {
                               if (ec) {
                                   Logger::server_message("Write failed: " + ec.message());
-                                  write_queue.clear();
+                                  m_write_queue.clear();
                                   m_writing = false;
                                   return;
                               }
-                              write_queue.pop_front();
+                              m_write_queue.pop_front();
                               _write();
                           });
     };
@@ -134,15 +131,10 @@ class SSLConnection : public Connection {
 
 class TCPConnection : public Connection {
   private:
-    asio::ip::tcp::socket  m_socket;
-    std::shared_ptr<Bytes> read_buffer;
-    bool                   m_writing = false;
+    asio::ip::tcp::socket m_socket;
 
   public:
-    TCPConnection(asio::ip::tcp::socket socket)
-        : m_socket(std::move(socket)), read_buffer(std::make_shared<Bytes>(8192)) {
-        read_buffer = std::make_shared<Bytes>();
-    }
+    TCPConnection(asio::ip::tcp::socket socket) : m_socket(std::move(socket)) {}
 
     bool connect(const std::string &ip, const std::string &port) override {};
     void read(Bytes &buffer) override {};
@@ -158,7 +150,7 @@ class TCPConnection : public Connection {
 
     void async_write(std::shared_ptr<Bytes> buffer) override {
         // m_ssl_stream.async_write_some();
-        write_queue.push_back(buffer);
+        m_write_queue.push_back(buffer);
 
         if (m_writing)
             return;
@@ -168,21 +160,21 @@ class TCPConnection : public Connection {
     };
 
     void _write() {
-        if (write_queue.empty()) {
+        if (m_write_queue.empty()) {
             m_writing = false;
             return;
         }
 
-        auto buffer = write_queue.front();
+        auto buffer = m_write_queue.front();
         asio::async_write(m_socket, asio::buffer(*buffer),
                           [this](const asio::error_code &ec, std::size_t bytes_transferred) {
                               if (ec) {
                                   Logger::server_message("Write failed: " + ec.message());
-                                  write_queue.clear();
+                                  m_write_queue.clear();
                                   m_writing = false;
                                   return;
                               }
-                              write_queue.pop_front();
+                              m_write_queue.pop_front();
                               _write();
                           });
     };

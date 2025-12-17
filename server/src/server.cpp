@@ -14,12 +14,15 @@ Server::Server(ServerConfig cfg) : m_config(cfg), m_router(cfg.port) {
 }
 
 void Server::run() {
-    sql::Driver *driver = sql::mariadb::get_driver_instance();
-    m_db                = std::unique_ptr<sql::Connection>(
-        driver->connect(m_config.db_address, m_config.db_user, m_config.db_password));
-    m_db->setSchema(m_config.db_schema);
+    connect_to_database();
+    setup_routes();
 
+    Logger::server_message(fmt::format("Server is running on port {}", 7777));
     m_router.use_ssl(m_config.cert_pem_path, m_config.cert_key_path);
+    m_router.run();
+}
+
+void Server::setup_routes() {
     m_router.on_packet<Proto::Login>(
         [this](std::shared_ptr<Proto::Connection> conn, Proto::Login &packet) {
             std::string stored = "$2a$12$EY9ePLW9EhYGPbMB09icfuY4wZ/5gJunAg3znsdQfZnrSzG3b5Fwa";
@@ -28,8 +31,7 @@ void Server::run() {
             Logger::server_message(fmt::format("A login request from {}", hash));
             Proto::Login req;
             req.username = packet.username;
-            auto s       = std::make_shared<Proto::Bytes>(req.serialize());
-            conn->async_write(s);
+            m_router.send_packet(conn, req);
         });
     m_router.on_packet<Proto::Register>(
         [this](std::shared_ptr<Proto::Connection> conn, Proto::Register &packet) {
@@ -47,25 +49,22 @@ void Server::run() {
                 }
             }
 
-            while (res->next()) {
-                std::cout << fmt::format("{} {} {} {}", res->getInt(1), res->getString(2).c_str(),
-                                         res->getString(3).c_str(), res->getString(4).c_str())
-                          << std::endl;
-            }
+            // while (res->next()) {
+            //     std::cout << fmt::format("{} {} {} {}", res->getInt(1),
+            //     res->getString(2).c_str(),
+            //                              res->getString(3).c_str(), res->getString(4).c_str())
+            //               << std::endl;
+            // }
 
             Logger::server_message(fmt::format("A login request from {}", packet.username));
             Proto::Login req;
             req.username = packet.username;
-            auto s       = std::make_shared<Proto::Bytes>(req.serialize());
-            conn->async_write(s);
+            m_router.send_packet(conn, req);
         });
     m_router.on_packet<Proto::Message>(
         [this](std::shared_ptr<Proto::Connection> conn, Proto::Message &packet) {
             broadcast_message(packet);
         });
-
-    Logger::server_message(fmt::format("Server is running on port {}", 7777));
-    m_router.run();
 }
 
 void Server::broadcast_message(Proto::Message &msg) {
@@ -73,4 +72,11 @@ void Server::broadcast_message(Proto::Message &msg) {
     for (const auto &[key, client] : m_router.clients) {
         client->async_write(s);
     }
+}
+
+void Server::connect_to_database() {
+    sql::Driver *driver = sql::mariadb::get_driver_instance();
+    m_db                = std::unique_ptr<sql::Connection>(
+        driver->connect(m_config.db_address, m_config.db_user, m_config.db_password));
+    m_db->setSchema(m_config.db_schema);
 }

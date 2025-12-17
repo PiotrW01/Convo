@@ -17,7 +17,9 @@ class Server {
     std::unique_ptr<sql::Connection> m_db;
 
   private:
+    void setup_routes();
     void broadcast_message(Proto::Message &msg);
+    void connect_to_database();
 
   public:
     ServerConfig config() const { return m_config; };

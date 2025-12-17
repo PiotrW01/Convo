@@ -54,23 +54,6 @@ struct PacketHeader {
 };
 #pragma pack(pop)
 
-inline bool is_header_ready(const Bytes &buffer) {
-    return (buffer.size() >= sizeof(PacketHeader));
-}
-
-inline bool is_packet_ready(const Bytes &buffer, const PayloadSize &payload_size) {
-    return buffer.size() >= sizeof(PacketHeader) + payload_size;
-}
-
-inline Payload get_payload(const Bytes &buffer, const PayloadSize &payload_size) {
-    return Payload(buffer.begin() + sizeof(PacketHeader),
-                   buffer.begin() + sizeof(PacketHeader) + payload_size);
-}
-
-inline void remove_packet(Bytes &buffer, const PayloadSize payload_size) {
-    buffer.erase(buffer.begin(), buffer.begin() + sizeof(PacketHeader) + payload_size);
-}
-
 struct Packet {
     virtual Bytes serialize()                       = 0;
     virtual void  deserialize(const Bytes &payload) = 0;
@@ -160,4 +143,22 @@ struct Error : Packet {
         error_description = std::string(payload.begin() + 1, payload.end());
     }
 };
+
+inline bool is_header_ready(const Bytes &buffer) {
+    return (buffer.size() >= sizeof(PacketHeader));
+}
+
+inline bool is_packet_ready(const Bytes &buffer, const PayloadSize &payload_size) {
+    return buffer.size() >= sizeof(PacketHeader) + payload_size;
+}
+
+inline Payload get_payload(const Bytes &buffer, const PayloadSize &payload_size) {
+    return Payload(buffer.begin() + sizeof(PacketHeader),
+                   buffer.begin() + sizeof(PacketHeader) + payload_size);
+}
+
+inline void remove_packet(Bytes &buffer, const PayloadSize payload_size) {
+    buffer.erase(buffer.begin(), buffer.begin() + sizeof(PacketHeader) + payload_size);
+}
+
 } // namespace Proto
