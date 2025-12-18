@@ -30,6 +30,8 @@ The project relies on the following libraries:
 
 - [libbcrypt](https://github.com/trusch/libbcrypt) - Password hashing for user authentication
 
+- [MariaDB](https://mariadb.org/) - Database and c++ connector
+
 ## Prerequisites
 
 Before building the project, run the following scripts to install dependencies and configure the database:
