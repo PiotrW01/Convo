@@ -16,6 +16,10 @@ This project serves as both a learning experience in secure network programming 
 
 ---
 
+## Platform support
+
+Convo is **primarily** developed and tested on Linux systems. While the project uses cross-platform libraries where possible, the build scripts, database setup, and runtime environment assume a Linux environment.
+
 ## Key Libraries / Dependencies
 
 The project relies on the following libraries:
